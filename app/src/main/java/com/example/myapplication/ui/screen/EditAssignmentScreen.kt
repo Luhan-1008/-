@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -22,9 +23,12 @@ import com.example.myapplication.data.database.AppDatabase
 import com.example.myapplication.data.model.AssignmentType
 import com.example.myapplication.data.model.Priority
 import com.example.myapplication.data.repository.AssignmentRepository
+import com.example.myapplication.data.repository.CourseRepository
+import com.example.myapplication.ui.components.showDateTimePicker
 import com.example.myapplication.ui.viewmodel.AssignmentViewModel
 import com.example.myapplication.ui.viewmodel.AssignmentViewModelFactory
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,11 +37,14 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
     val context = LocalContext.current
     val database = AppDatabase.getDatabase(context)
     val repository = AssignmentRepository(database.assignmentDao())
+    val courseRepository = CourseRepository(database.courseDao())
     val viewModel: AssignmentViewModel = viewModel(
         factory = AssignmentViewModelFactory(repository)
     )
     
     val assignment by viewModel.selectedAssignment.collectAsState()
+    val userId = com.example.myapplication.session.CurrentSession.userIdInt ?: 0
+    val courses by courseRepository.getCoursesByUser(userId).collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     
     LaunchedEffect(assignmentId) {
@@ -64,13 +71,18 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
     var dueDate by remember { mutableStateOf(Date(assignment!!.dueDate)) }
     var reminderEnabled by remember { mutableStateOf(assignment!!.reminderEnabled) }
     var priority by remember { mutableStateOf<Priority>(assignment!!.priority) }
+    var selectedCourseId by remember { mutableStateOf(assignment!!.courseId) }
+    var progress by remember { mutableFloatStateOf(assignment!!.progress.toFloat()) }
+    var showCourseDropdown by remember { mutableStateOf(false) }
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val dueDateDisplay = remember(dueDate) { dateFormatter.format(dueDate) }
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
                     Text(
-                        text = "编辑作业",
+                        text = "编辑任务",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -143,6 +155,121 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
                             maxLines = 5,
                             shape = RoundedCornerShape(12.dp)
                         )
+
+                        Text(
+                            text = "关联课程（可选）",
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                        val selectedCourse = courses.find { it.courseId == selectedCourseId }
+                        ExposedDropdownMenuBox(
+                            expanded = showCourseDropdown,
+                            onExpandedChange = { showCourseDropdown = !showCourseDropdown }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedCourse?.courseName ?: "未选择课程",
+                                onValueChange = { },
+                                readOnly = true,
+                                label = { Text("选择课程") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = showCourseDropdown)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = showCourseDropdown,
+                                onDismissRequest = { showCourseDropdown = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("不关联课程") },
+                                    onClick = {
+                                        selectedCourseId = null
+                                        showCourseDropdown = false
+                                    }
+                                )
+                                courses.forEach { course ->
+                                    DropdownMenuItem(
+                                        text = { Text(course.courseName) },
+                                        onClick = {
+                                            selectedCourseId = course.courseId
+                                            showCourseDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                        Text(
+                            text = "截止时间",
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = dueDateDisplay,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "请选择准确的截止日期和时间",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        showDateTimePicker(context, dueDate) { selected ->
+                                            dueDate = selected
+                                        }
+                                    }
+                                ) {
+                                    Text("调整")
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "任务进度",
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Slider(
+                                value = progress,
+                                onValueChange = { progress = it },
+                                valueRange = 0f..100f,
+                                steps = 9,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "${progress.toInt()}%",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 
@@ -316,6 +443,12 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
                 Button(
                     onClick = {
                         if (title.isNotBlank()) {
+                            val progressValue = progress.toInt()
+                            val adjustedStatus = when {
+                                progressValue >= 100 -> com.example.myapplication.data.model.AssignmentStatus.COMPLETED
+                                progressValue > 0 -> com.example.myapplication.data.model.AssignmentStatus.IN_PROGRESS
+                                else -> com.example.myapplication.data.model.AssignmentStatus.NOT_STARTED
+                            }
                             val updatedAssignment = assignment!!.copy(
                                 title = title,
                                 description = description.ifBlank { null },
@@ -323,7 +456,10 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
                                 dueDate = dueDate.time,
                                 reminderEnabled = reminderEnabled,
                                 reminderTime = if (reminderEnabled) dueDate.time - 24 * 60 * 60 * 1000 else null,
-                                priority = priority
+                                priority = priority,
+                                courseId = selectedCourseId,
+                                progress = progressValue,
+                                status = adjustedStatus
                             )
                             viewModel.updateAssignment(updatedAssignment)
                             navController.popBackStack()
@@ -340,7 +476,7 @@ fun EditAssignmentScreen(navController: NavHostController, assignmentId: Int?) {
                     )
                 ) {
                     Text(
-                        text = "保存作业",
+                        text = "保存任务",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

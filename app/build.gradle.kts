@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myapplication"
-        minSdk = 24
+        minSdk = 26  // 升级到26以支持Apache POI
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -80,6 +80,18 @@ dependencies {
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+    
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // ZXing for QR code generation
+    implementation("com.google.zxing:core:3.5.2")
+    
+    // Apache POI for Excel file parsing
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+    
+    // CSV parsing (simple implementation, no external library needed)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

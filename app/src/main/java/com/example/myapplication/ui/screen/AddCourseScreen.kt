@@ -49,7 +49,17 @@ fun AddCourseScreen(navController: NavHostController) {
     var reminderMinutes by remember { mutableStateOf(15) }
     var color by remember { mutableStateOf("#2196F3") }
     
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val insertSuccess by viewModel.insertSuccess.collectAsState()
     val weekDays = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    
+    // 监听插入成功
+    LaunchedEffect(insertSuccess) {
+        if (insertSuccess) {
+            viewModel.resetInsertSuccess()
+            navController.popBackStack()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -323,11 +333,62 @@ fun AddCourseScreen(navController: NavHostController) {
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
+                // 显示错误消息
+                errorMessage?.let { error ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            TextButton(onClick = { viewModel.clearError() }) {
+                                Text("关闭")
+                            }
+                        }
+                    }
+                }
+                
                 Button(
                     onClick = {
                         if (courseName.isNotBlank()) {
+                            val currentUserId = com.example.myapplication.session.CurrentSession.userIdInt
+                            if (currentUserId == null || currentUserId == 0) {
+                                viewModel.insertCourse(
+                                    Course(
+                                        userId = 0, // 这会触发错误处理
+                                        courseName = courseName,
+                                        courseCode = courseCode.ifBlank { null },
+                                        teacherName = teacherName.ifBlank { null },
+                                        location = location.ifBlank { null },
+                                        dayOfWeek = dayOfWeek,
+                                        startTime = startTime,
+                                        endTime = endTime,
+                                        startWeek = startWeek,
+                                        endWeek = endWeek,
+                                        reminderEnabled = reminderEnabled,
+                                        reminderMinutes = reminderMinutes,
+                                        color = color
+                                    )
+                                )
+                                return@Button
+                            }
+                            
                             val course = Course(
-                                userId = com.example.myapplication.session.CurrentSession.userIdInt ?: 0,
+                                userId = currentUserId,
                                 courseName = courseName,
                                 courseCode = courseCode.ifBlank { null },
                                 teacherName = teacherName.ifBlank { null },
@@ -342,7 +403,7 @@ fun AddCourseScreen(navController: NavHostController) {
                                 color = color
                             )
                             viewModel.insertCourse(course)
-                            navController.popBackStack()
+                            // 成功后会通过 LaunchedEffect 自动返回
                         }
                     },
                     modifier = Modifier

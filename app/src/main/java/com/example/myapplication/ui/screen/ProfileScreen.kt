@@ -16,11 +16,97 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.myapplication.data.database.AppDatabase
+import com.example.myapplication.data.repository.UserRepository
+import com.example.myapplication.data.repository.RemoteUserRepository
+import com.example.myapplication.ui.navigation.Screen
+import com.example.myapplication.ui.viewmodel.UserViewModel
+import com.example.myapplication.ui.viewmodel.UserViewModelFactory
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import com.example.myapplication.ui.components.PrimaryGradientButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.InputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    val database = AppDatabase.getDatabase(context)
+    val repository = UserRepository(database.userDao())
+    val remoteRepository = remember { null as RemoteUserRepository? }
+    val viewModel: UserViewModel = viewModel(
+        factory = UserViewModelFactory(repository, remoteRepository)
+    )
+    
+    val currentUser by viewModel.currentUser.collectAsState()
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val scope = rememberCoroutineScope()
+    
+    // 加载当前用户信息
+    LaunchedEffect(Unit) {
+        viewModel.loadCurrentUser()
+    }
+    
+    // 加载头像
+    LaunchedEffect(currentUser?.avatarUrl) {
+        if (currentUser?.avatarUrl != null) {
+            scope.launch {
+                try {
+                    val uri = Uri.parse(currentUser?.avatarUrl)
+                    val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+                    inputStream?.use {
+                        val bitmap = BitmapFactory.decodeStream(it)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+    
+    // 图片选择器
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val inputStream: InputStream? = context.contentResolver.openInputStream(it)
+                    inputStream?.use { stream ->
+                        val bitmap = BitmapFactory.decodeStream(stream)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                        
+                        // 保存头像URI到用户信息
+                        val updatedUser = currentUser?.copy(avatarUrl = it.toString())
+                        if (updatedUser != null) {
+                            withContext(Dispatchers.IO) {
+                                repository.updateUser(updatedUser)
+                            }
+                            viewModel.loadCurrentUser()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -45,27 +131,18 @@ fun ProfileScreen(navController: NavHostController) {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // 用户信息卡片 - 美化版
+            // 用户信息卡片
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .shadow(4.dp, shape = RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                    MaterialTheme.colorScheme.surface
-                                )
-                            )
-                        )
-                        .padding(24.dp),
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -74,49 +151,74 @@ fun ProfileScreen(navController: NavHostController) {
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary
-                                    )
-                                )
-                            ),
+                            .clickable { imagePickerLauncher.launch("image/*") }
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "头像",
-                            modifier = Modifier.size(48.dp),
-                            tint = Color.White
-                        )
+                        if (avatarBitmap != null) {
+                            Image(
+                                bitmap = avatarBitmap!!,
+                                contentDescription = "头像",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "头像",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                     
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "学生",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "学号: 待设置",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        val user = currentUser
+                        if (user != null) {
+                            if (!user.realName.isNullOrEmpty()) {
+                                Text(
+                                    text = user.realName,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = user.username,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            val studentId = user.studentId
+                            if (!studentId.isNullOrEmpty()) {
+                                Text(
+                                    text = "学号: $studentId",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            val email = user.email
+                            if (!email.isNullOrEmpty()) {
+                                Text(
+                                    text = email,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
                     }
                 }
             }
             
-            // 功能列表 - 美化版
+            // 功能列表
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .shadow(4.dp, shape = RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
@@ -127,9 +229,9 @@ fun ProfileScreen(navController: NavHostController) {
                 ) {
                     Text(
                         text = "功能",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                     
                     NavigationMenuItem(
@@ -157,7 +259,91 @@ fun ProfileScreen(navController: NavHostController) {
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            // 退出登录按钮
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Button(
+                    onClick = {
+                        showLogoutDialog = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "退出登录",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "退出登录",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
+    }
+    
+    // 退出登录确认对话框
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = {
+                Text(
+                    text = "确认退出",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "确定要退出登录吗？退出后需要重新登录才能使用应用。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        viewModel.logout()
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("退出")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLogoutDialog = false }
+                ) {
+                    Text("取消")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 }
 
@@ -206,7 +392,6 @@ fun NavigationMenuItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // 使用简单的文本指示器
             Text(
                 text = "›",
                 style = MaterialTheme.typography.titleLarge,

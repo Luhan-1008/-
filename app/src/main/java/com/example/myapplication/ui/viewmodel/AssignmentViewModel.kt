@@ -77,6 +77,12 @@ class AssignmentViewModel(private val repository: AssignmentRepository) : ViewMo
             repository.updateAssignmentStatus(assignmentId, status)
         }
     }
+
+    fun updateAssignmentProgress(assignmentId: Int, progress: Int) {
+        viewModelScope.launch {
+            repository.updateAssignmentProgress(assignmentId, progress)
+        }
+    }
 }
 
 class AssignmentViewModelFactory(private val repository: AssignmentRepository) : ViewModelProvider.Factory {

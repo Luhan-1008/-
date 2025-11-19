@@ -32,5 +32,8 @@ class AssignmentRepository(private val assignmentDao: AssignmentDao) {
     
     suspend fun updateAssignmentStatus(assignmentId: Int, status: AssignmentStatus) = 
         assignmentDao.updateAssignmentStatus(assignmentId, status)
+
+    suspend fun updateAssignmentProgress(assignmentId: Int, progress: Int) =
+        assignmentDao.updateAssignmentProgress(assignmentId, progress)
 }
 

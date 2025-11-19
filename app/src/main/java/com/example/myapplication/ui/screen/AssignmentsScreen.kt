@@ -7,9 +7,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,32 +25,75 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.myapplication.data.database.AppDatabase
 import com.example.myapplication.data.model.AssignmentStatus
+import com.example.myapplication.data.model.Priority
 import com.example.myapplication.data.repository.AssignmentRepository
+import com.example.myapplication.data.repository.CourseRepository
+import com.example.myapplication.session.CurrentSession
 import com.example.myapplication.ui.navigation.Screen
 import com.example.myapplication.ui.viewmodel.AssignmentViewModel
 import com.example.myapplication.ui.viewmodel.AssignmentViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssignmentsScreen(navController: NavHostController) {
+fun AssignmentsScreen(
+    navController: NavHostController,
+    initialCourseId: Int? = null
+) {
     val context = LocalContext.current
     val database = AppDatabase.getDatabase(context)
     val repository = AssignmentRepository(database.assignmentDao())
+    val courseRepository = CourseRepository(database.courseDao())
     val viewModel: AssignmentViewModel = viewModel(
         factory = AssignmentViewModelFactory(repository)
     )
     
     val assignments by viewModel.assignments.collectAsState()
+    val userId = CurrentSession.userIdInt ?: 0
+    val courses by remember(userId) {
+        courseRepository.getCoursesByUser(userId)
+    }.collectAsState(initial = emptyList())
+    val courseMap = remember(courses) { courses.associateBy { it.courseId } }
     var selectedStatus by remember { mutableStateOf<AssignmentStatus?>(null) }
+    var searchText by remember { mutableStateOf("") }
+    var courseFilter by remember(initialCourseId) { mutableStateOf(initialCourseId) }
+    
+    val priorityWeight = remember {
+        mapOf(
+            Priority.HIGH to 3,
+            Priority.MEDIUM to 2,
+            Priority.LOW to 1
+        )
+    }
+    
+    val filteredAssignments = remember(assignments, searchText, courseFilter, courseMap) {
+        val query = searchText.trim().lowercase()
+        assignments
+            .filter { assignment ->
+                val matchesStatus = selectedStatus?.let { assignment.status == it } ?: true
+                val matchesCourseFilter = courseFilter?.let { assignment.courseId == it } ?: true
+                val matchesSearch = if (query.isEmpty()) {
+                    true
+                } else {
+                    assignment.title.lowercase().contains(query) ||
+                            (courseMap[assignment.courseId]?.courseName?.lowercase()?.contains(query) == true)
+                }
+                matchesStatus && matchesCourseFilter && matchesSearch
+            }
+            .sortedWith(
+                compareBy<com.example.myapplication.data.model.Assignment> { it.dueDate }
+                    .thenByDescending { priorityWeight[it.priority] ?: 0 }
+            )
+    }
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
                     Text(
-                        text = "作业与实验",
+                        text = "任务看板",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -66,9 +112,9 @@ fun AssignmentsScreen(navController: NavHostController) {
                 contentColor = Color.White,
                 modifier = Modifier.shadow(8.dp, shape = RoundedCornerShape(16.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "添加作业")
+                Icon(Icons.Default.Add, contentDescription = "添加任务")
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("添加作业")
+                Text("添加任务")
             }
         }
     ) { padding ->
@@ -116,21 +162,50 @@ fun AssignmentsScreen(navController: NavHostController) {
                 }
             }
             
-            LaunchedEffect(selectedStatus) {
-                if (selectedStatus == null) {
-                    viewModel.getUpcomingAssignments()
-                } else {
-                    viewModel.getAssignmentsByStatus(selectedStatus!!)
+            // 搜索与筛选
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "搜索")
+                    },
+                    placeholder = { Text("搜索任务或课程") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                if (courseFilter != null) {
+                    AssistChip(
+                        onClick = { courseFilter = null },
+                        label = {
+                            Text(
+                                text = "课程筛选：${courseMap[courseFilter]?.courseName ?: "已选择"} (点击清除)"
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "清除"
+                            )
+                        }
+                    )
                 }
             }
             
-            // 作业列表
+            // 任务列表
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (assignments.isEmpty()) {
+                if (filteredAssignments.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
@@ -147,12 +222,12 @@ fun AssignmentsScreen(navController: NavHostController) {
                                     style = MaterialTheme.typography.displayLarge
                                 )
                                 Text(
-                                    text = "暂无作业",
+                                    text = "暂无任务",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "点击右下角按钮添加作业",
+                                    text = "点击右下角按钮添加任务",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
@@ -160,9 +235,11 @@ fun AssignmentsScreen(navController: NavHostController) {
                         }
                     }
                 } else {
-                    items(assignments) { assignment ->
+                    items(filteredAssignments) { assignment ->
+                        val courseName = courseMap[assignment.courseId]?.courseName
                         AssignmentCard(
                             assignment = assignment,
+                            courseName = courseName,
                             onEdit = {
                                 navController.navigate("${Screen.EditAssignment.route}/${assignment.assignmentId}")
                             },
@@ -171,6 +248,15 @@ fun AssignmentsScreen(navController: NavHostController) {
                             },
                             onStatusChange = { status ->
                                 viewModel.updateAssignmentStatus(assignment.assignmentId, status)
+                            },
+                            onProgressChange = { assignmentId, progressValue ->
+                                viewModel.updateAssignmentProgress(assignmentId, progressValue)
+                                val autoStatus = when {
+                                    progressValue >= 100 -> AssignmentStatus.COMPLETED
+                                    progressValue > 0 -> AssignmentStatus.IN_PROGRESS
+                                    else -> AssignmentStatus.NOT_STARTED
+                                }
+                                viewModel.updateAssignmentStatus(assignmentId, autoStatus)
                             }
                         )
                     }
@@ -183,9 +269,11 @@ fun AssignmentsScreen(navController: NavHostController) {
 @Composable
 fun AssignmentCard(
     assignment: com.example.myapplication.data.model.Assignment,
+    courseName: String?,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onStatusChange: (AssignmentStatus) -> Unit
+    onStatusChange: (AssignmentStatus) -> Unit,
+    onProgressChange: (Int, Int) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
@@ -204,6 +292,12 @@ fun AssignmentCard(
         AssignmentStatus.IN_PROGRESS -> "🔄"
         AssignmentStatus.NOT_STARTED -> "📝"
     }
+    
+    var sliderValue by remember { mutableFloatStateOf(assignment.progress.toFloat()) }
+    LaunchedEffect(assignment.progress) {
+        sliderValue = assignment.progress.toFloat()
+    }
+    val sliderProgress = (sliderValue / 100f).coerceIn(0f, 1f)
     
     Card(
         modifier = Modifier
@@ -269,6 +363,22 @@ fun AssignmentCard(
                         )
                     }
                     
+                    // 关联课程显示
+                    if (courseName != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "📚 $courseName",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
                     if (!assignment.description.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -281,6 +391,18 @@ fun AssignmentCard(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
+                    // 优先级显示
+                    val priorityColor = when (assignment.priority) {
+                        com.example.myapplication.data.model.Priority.HIGH -> MaterialTheme.colorScheme.error
+                        com.example.myapplication.data.model.Priority.MEDIUM -> Color(0xFFFF9800)
+                        com.example.myapplication.data.model.Priority.LOW -> Color(0xFF4CAF50)
+                    }
+                    val priorityText = when (assignment.priority) {
+                        com.example.myapplication.data.model.Priority.HIGH -> "高优先级"
+                        com.example.myapplication.data.model.Priority.MEDIUM -> "中优先级"
+                        com.example.myapplication.data.model.Priority.LOW -> "低优先级"
+                    }
+                    
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -289,7 +411,11 @@ fun AssignmentCard(
                             onClick = { },
                             label = { 
                                 Text(
-                                    assignment.type.name,
+                                    when (assignment.type) {
+                                        com.example.myapplication.data.model.AssignmentType.HOMEWORK -> "作业"
+                                        com.example.myapplication.data.model.AssignmentType.EXPERIMENT -> "实验"
+                                        com.example.myapplication.data.model.AssignmentType.OTHER -> "其他"
+                                    },
                                     style = MaterialTheme.typography.labelSmall
                                 ) 
                             },
@@ -301,7 +427,25 @@ fun AssignmentCard(
                             onClick = { },
                             label = { 
                                 Text(
-                                    assignment.status.name,
+                                    priorityText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = priorityColor
+                                ) 
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = priorityColor.copy(alpha = 0.2f)
+                            )
+                        )
+                        AssistChip(
+                            onClick = { },
+                            label = { 
+                                Text(
+                                    when (assignment.status) {
+                                        AssignmentStatus.COMPLETED -> "已完成"
+                                        AssignmentStatus.OVERDUE -> "已逾期"
+                                        AssignmentStatus.IN_PROGRESS -> "进行中"
+                                        AssignmentStatus.NOT_STARTED -> "未开始"
+                                    },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = statusColor
                                 ) 
@@ -309,6 +453,52 @@ fun AssignmentCard(
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = statusColor.copy(alpha = 0.2f)
                             )
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 进度调节
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "进度",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${sliderValue.toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                        Slider(
+                            value = sliderValue,
+                            onValueChange = { sliderValue = it },
+                            valueRange = 0f..100f,
+                            steps = 19,
+                            modifier = Modifier.fillMaxWidth(),
+                            onValueChangeFinished = {
+                                onProgressChange(assignment.assignmentId, sliderValue.roundToInt())
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = statusColor,
+                                activeTrackColor = statusColor
+                            )
+                        )
+                        LinearProgressIndicator(
+                            progress = sliderProgress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = statusColor,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
                 }

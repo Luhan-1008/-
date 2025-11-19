@@ -25,6 +25,7 @@ import androidx.navigation.NavHostController
 import com.example.myapplication.data.database.AppDatabase
 import com.example.myapplication.data.repository.UserRepository
 import com.example.myapplication.data.repository.RemoteUserRepository
+import com.example.myapplication.ui.components.PrimaryGradientButton
 import com.example.myapplication.ui.navigation.Screen
 import com.example.myapplication.ui.viewmodel.AuthResult
 import com.example.myapplication.ui.viewmodel.UserViewModel
@@ -36,11 +37,13 @@ fun LoginScreen(navController: NavHostController) {
     val context = LocalContext.current
     val database = AppDatabase.getDatabase(context)
     val repository = UserRepository(database.userDao())
-    val remoteRepository = remember { RemoteUserRepository() }
+    // 不使用后端，直接使用本地登录
+    val remoteRepository = remember { null as RemoteUserRepository? }
     val viewModel: UserViewModel = viewModel(
         factory = UserViewModelFactory(repository, remoteRepository)
     )
     
+    var studentId by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -61,6 +64,8 @@ fun LoginScreen(navController: NavHostController) {
             null -> {}
         }
     }
+    
+    val isLoginEnabled = studentId.isNotBlank() && username.isNotBlank() && password.isNotBlank() && loginResult !is AuthResult.Success
     
     Scaffold(
         topBar = {
@@ -142,6 +147,16 @@ fun LoginScreen(navController: NavHostController) {
                             )
                             
                             OutlinedTextField(
+                                value = studentId,
+                                onValueChange = { studentId = it },
+                                label = { Text("学号") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = loginResult !is AuthResult.Success
+                            )
+                            
+                            OutlinedTextField(
                                 value = username,
                                 onValueChange = { username = it },
                                 label = { Text("用户名") },
@@ -181,28 +196,12 @@ fun LoginScreen(navController: NavHostController) {
                                 )
                             }
                             
-                            Button(
-                                onClick = {
-                                    if (username.isNotBlank() && password.isNotBlank()) {
-                                        viewModel.login(username, password)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .shadow(4.dp, shape = RoundedCornerShape(16.dp)),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White
-                                ),
-                                enabled = username.isNotBlank() && password.isNotBlank() && loginResult !is AuthResult.Success
+                            PrimaryGradientButton(
+                                text = "登录",
+                                enabled = isLoginEnabled,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = "登录",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                viewModel.login(studentId, username, password)
                             }
                         }
                     }

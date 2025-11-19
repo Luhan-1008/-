@@ -30,7 +30,7 @@ class UserViewModel(
     private val _registerResult = MutableStateFlow<AuthResult?>(null)
     val registerResult: StateFlow<AuthResult?> = _registerResult.asStateFlow()
     
-    fun login(username: String, password: String) {
+    fun login(studentId: String, username: String, password: String) {
         viewModelScope.launch {
             try {
                 if (remoteRepository != null) {
@@ -40,8 +40,8 @@ class UserViewModel(
                         CurrentSession.token = resp.token
                         CurrentSession.userId = resp.userId
                         // 如果需要本地缓存用户，可尝试查询或插入本地用户
-                        val localUser = repository.login(username, password)
-                        _currentUser.value = localUser ?: User(username = username, password = password)
+                        val localUser = repository.login(studentId, username, password)
+                        _currentUser.value = localUser ?: User(username = username, password = password, studentId = studentId)
                         _loginResult.value = AuthResult.Success
                         return@launch
                     } else {
@@ -50,8 +50,10 @@ class UserViewModel(
                     }
                 }
                 // 回退到本地 Room 登录
-                val user = repository.login(username, password)
+                val user = repository.login(studentId, username, password)
                 if (user != null) {
+                    // 设置会话信息
+                    CurrentSession.userId = user.userId.toLong()
                     _currentUser.value = user
                     _loginResult.value = AuthResult.Success
                 } else {
@@ -93,6 +95,9 @@ class UserViewModel(
                 }
                 val userId = repository.register(user)
                 if (userId > 0) {
+                    // 注册成功后自动登录，设置会话信息
+                    CurrentSession.userId = userId.toLong()
+                    _currentUser.value = user.copy(userId = userId.toInt())
                     _registerResult.value = AuthResult.Success
                 } else {
                     _registerResult.value = AuthResult.Error("注册失败")
@@ -113,6 +118,18 @@ class UserViewModel(
     
     fun logout() {
         _currentUser.value = null
+        CurrentSession.userId = null
+        CurrentSession.token = null
+    }
+    
+    fun loadCurrentUser() {
+        viewModelScope.launch {
+            val userId = CurrentSession.userIdInt
+            if (userId != null && userId > 0) {
+                val user = repository.getUserById(userId)
+                _currentUser.value = user
+            }
+        }
     }
 }
 
