@@ -9,8 +9,10 @@ class UserRepository(private val userDao: UserDao) {
     
     suspend fun getUserById(userId: Int): User? = userDao.getUserById(userId)
     
-    suspend fun login(username: String, password: String): User? = 
-        userDao.login(username, password)
+    suspend fun getUserByStudentId(studentId: String): User? = userDao.getUserByStudentId(studentId)
+    
+    suspend fun login(studentId: String, username: String, password: String): User? = 
+        userDao.login(studentId, username, password)
     
     suspend fun register(user: User): Long = userDao.insertUser(user)
     

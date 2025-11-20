@@ -28,6 +28,7 @@ import com.example.myapplication.data.database.AppDatabase
 import com.example.myapplication.data.model.User
 import com.example.myapplication.data.repository.UserRepository
 import com.example.myapplication.data.repository.RemoteUserRepository
+import com.example.myapplication.ui.components.PrimaryGradientButton
 import com.example.myapplication.ui.navigation.Screen
 import com.example.myapplication.ui.viewmodel.AuthResult
 import com.example.myapplication.ui.viewmodel.UserViewModel
@@ -39,7 +40,8 @@ fun RegisterScreen(navController: NavHostController) {
     val context = LocalContext.current
     val database = AppDatabase.getDatabase(context)
     val repository = UserRepository(database.userDao())
-    val remoteRepository = remember { RemoteUserRepository() }
+    // 不使用后端，直接使用本地注册
+    val remoteRepository = remember { null as RemoteUserRepository? }
     val viewModel: UserViewModel = viewModel(
         factory = UserViewModelFactory(repository, remoteRepository)
     )
@@ -55,6 +57,14 @@ fun RegisterScreen(navController: NavHostController) {
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     
     val registerResult by viewModel.registerResult.collectAsState()
+    
+    val isRegisterEnabled =
+        username.isNotBlank() &&
+        password.isNotBlank() &&
+        confirmPassword.isNotBlank() &&
+        password == confirmPassword &&
+        studentId.isNotBlank() &&
+        registerResult !is AuthResult.Success
     
     // 处理注册结果
     LaunchedEffect(registerResult) {
@@ -214,7 +224,7 @@ fun RegisterScreen(navController: NavHostController) {
                         OutlinedTextField(
                             value = studentId,
                             onValueChange = { studentId = it },
-                            label = { Text("学号") },
+                            label = { Text("学号 *") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -264,48 +274,19 @@ fun RegisterScreen(navController: NavHostController) {
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                Button(
-                    onClick = {
-                        // 验证输入
-                        if (username.isBlank()) {
-                            return@Button
-                        }
-                        if (password.isBlank()) {
-                            return@Button
-                        }
-                        if (password != confirmPassword) {
-                            return@Button
-                        }
-                        
-                        val user = User(
-                            username = username,
-                            password = password, // 实际应用中应该加密
-                            studentId = studentId.ifBlank { null },
-                            realName = realName.ifBlank { null },
-                            email = email.ifBlank { null }
-                        )
-                        viewModel.register(user)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .shadow(4.dp, shape = RoundedCornerShape(16.dp)),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
-                    ),
-                    enabled = username.isNotBlank() && 
-                             password.isNotBlank() && 
-                             confirmPassword.isNotBlank() &&
-                             password == confirmPassword &&
-                             registerResult !is AuthResult.Success
+                PrimaryGradientButton(
+                    text = "注册",
+                    enabled = isRegisterEnabled,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "注册",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                    val user = User(
+                        username = username,
+                        password = password,
+                        studentId = studentId.trim(),
+                        realName = realName.ifBlank { null },
+                        email = email.ifBlank { null }
                     )
+                    viewModel.register(user)
                 }
                 
                 // 密码不匹配提示

@@ -1,5 +1,6 @@
 package com.example.myapplication.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -35,7 +36,9 @@ data class Assignment(
     val reminderEnabled: Boolean = true,
     val reminderTime: Long? = null, // 时间戳
     val status: AssignmentStatus = AssignmentStatus.NOT_STARTED,
-    val priority: Priority = Priority.MEDIUM
+    val priority: Priority = Priority.MEDIUM,
+    @ColumnInfo(defaultValue = "0")
+    val progress: Int = 0
 )
 
 enum class AssignmentType {

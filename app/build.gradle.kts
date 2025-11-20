@@ -13,14 +13,14 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myapplication"
-        minSdk = 24
+        minSdk = 26  // å‡çº§åˆ°26ä»¥æ”¯æŒApache POI
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Ìá¹©ºó¶Ë Base URL ¸ø´úÂëÊ¹ÓÃ£ºBuildConfig.API_BASE_URL
+        // ï¿½á¹©ï¿½ï¿½ï¿½ Base URL ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã£ï¿½BuildConfig.API_BASE_URL
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/\"")
     }
 
@@ -42,7 +42,7 @@ android {
     }
     buildFeatures {
         compose = true
-        // ÏÔÊ½¿ªÆô BuildConfig Éú³É£¨Ó¦ÓÃÄ£¿éÄ¬ÈÏ¿ªÆô£¬ÕâÀïÈ·±£ÎŞÆçÒå£©
+        // ï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ BuildConfig ï¿½ï¿½ï¿½É£ï¿½Ó¦ï¿½ï¿½Ä£ï¿½ï¿½Ä¬ï¿½Ï¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½å£©
         buildConfig = true
     }
 }
@@ -80,6 +80,18 @@ dependencies {
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+    
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // ZXing for QR code generation
+    implementation("com.google.zxing:core:3.5.2")
+    
+    // Apache POI for Excel file parsing
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+    
+    // CSV parsing (simple implementation, no external library needed)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

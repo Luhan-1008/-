@@ -35,9 +35,3 @@ data class Note(
     val fileUrl: String? = null
 )
 
-enum class FileType {
-    AUDIO, // 录音
-    IMAGE, // 图片
-    TEXT // 文本
-}
-

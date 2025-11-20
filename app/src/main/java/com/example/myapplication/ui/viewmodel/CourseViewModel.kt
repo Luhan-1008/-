@@ -17,6 +17,12 @@ class CourseViewModel(private val repository: CourseRepository) : ViewModel() {
     private val _selectedCourse = MutableStateFlow<Course?>(null)
     val selectedCourse: StateFlow<Course?> = _selectedCourse.asStateFlow()
     
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    
+    private val _insertSuccess = MutableStateFlow<Boolean>(false)
+    val insertSuccess: StateFlow<Boolean> = _insertSuccess.asStateFlow()
+    
     private val userId: Int
         get() = com.example.myapplication.session.CurrentSession.userIdInt ?: 0
     
@@ -46,8 +52,37 @@ class CourseViewModel(private val repository: CourseRepository) : ViewModel() {
     
     fun insertCourse(course: Course) {
         viewModelScope.launch {
-            repository.insertCourse(course)
+            try {
+                // 检查用户是否已登录
+                val currentUserId = com.example.myapplication.session.CurrentSession.userIdInt
+                if (currentUserId == null || currentUserId == 0) {
+                    _errorMessage.value = "请先登录后再添加课程"
+                    return@launch
+                }
+                
+                // 验证 userId 是否有效（外键约束）
+                if (course.userId != currentUserId) {
+                    _errorMessage.value = "用户ID不匹配，请重新登录"
+                    return@launch
+                }
+                
+                repository.insertCourse(course)
+                _errorMessage.value = null
+                _insertSuccess.value = true
+            } catch (e: Exception) {
+                _errorMessage.value = "添加课程失败: ${e.message}"
+                _insertSuccess.value = false
+                e.printStackTrace()
+            }
         }
+    }
+    
+    fun clearError() {
+        _errorMessage.value = null
+    }
+    
+    fun resetInsertSuccess() {
+        _insertSuccess.value = false
     }
     
     fun updateCourse(course: Course) {
@@ -59,6 +94,43 @@ class CourseViewModel(private val repository: CourseRepository) : ViewModel() {
     fun deleteCourse(course: Course) {
         viewModelScope.launch {
             repository.deleteCourse(course)
+        }
+    }
+    
+    fun importCourses(courses: List<Course>) {
+        viewModelScope.launch {
+            try {
+                val currentUserId = com.example.myapplication.session.CurrentSession.userIdInt
+                if (currentUserId == null || currentUserId == 0) {
+                    _errorMessage.value = "请先登录后再导入课程"
+                    return@launch
+                }
+                
+                var successCount = 0
+                var failCount = 0
+                
+                courses.forEach { course ->
+                    try {
+                        // 确保userId正确
+                        val courseWithUserId = course.copy(userId = currentUserId)
+                        repository.insertCourse(courseWithUserId)
+                        successCount++
+                    } catch (e: Exception) {
+                        failCount++
+                        e.printStackTrace()
+                    }
+                }
+                
+                if (failCount == 0) {
+                    _errorMessage.value = null
+                    _insertSuccess.value = true
+                } else {
+                    _errorMessage.value = "成功导入 $successCount 门课程，失败 $failCount 门"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "导入课程失败: ${e.message}"
+                e.printStackTrace()
+            }
         }
     }
 }

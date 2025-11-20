@@ -13,6 +13,9 @@ class StudyGroupRepository(private val studyGroupDao: StudyGroupDao) {
     fun searchPublicGroups(courseId: Int?, topic: String): Flow<List<StudyGroup>> = 
         studyGroupDao.searchPublicGroups(courseId, "%$topic%")
     
+    fun getGroupsByCourse(courseId: Int): Flow<List<StudyGroup>> = 
+        studyGroupDao.getGroupsByCourse(courseId)
+    
     suspend fun insertGroup(group: StudyGroup): Long = studyGroupDao.insertGroup(group)
     
     suspend fun updateGroup(group: StudyGroup) = studyGroupDao.updateGroup(group)

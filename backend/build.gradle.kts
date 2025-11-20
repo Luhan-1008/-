@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.compile.JavaCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -9,7 +10,7 @@ plugins {
 }
 
 java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(17)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(22)) }
 }
 
 repositories { mavenCentral() }
@@ -19,9 +20,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    // Ê¹ÓÃ Spring Boot ¹ÜÀí°æ±¾µÄ MySQL Connector
+    // Ê¹ï¿½ï¿½ Spring Boot ï¿½ï¿½ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½ MySQL Connector
     runtimeOnly("com.mysql:mysql-connector-j")
-    // ½â¾ö kotlin/reflect/full/KClasses ClassNotFound£¬ÐèÒªÏÔÊ½ÒýÈë kotlin-reflect
+    // ï¿½ï¿½ï¿½ kotlin/reflect/full/KClasses ClassNotFoundï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ kotlin-reflect
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
@@ -31,6 +32,10 @@ dependencies {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions { jvmTarget = "17"; freeCompilerArgs += "-Xjsr305=strict" }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(17)
 }
 
 tasks.withType<Test> { useJUnitPlatform() }

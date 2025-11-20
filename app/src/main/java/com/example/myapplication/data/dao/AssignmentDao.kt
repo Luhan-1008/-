@@ -33,5 +33,8 @@ interface AssignmentDao {
     
     @Query("UPDATE assignments SET status = :status WHERE assignmentId = :assignmentId")
     suspend fun updateAssignmentStatus(assignmentId: Int, status: AssignmentStatus)
+
+    @Query("UPDATE assignments SET progress = :progress WHERE assignmentId = :assignmentId")
+    suspend fun updateAssignmentProgress(assignmentId: Int, progress: Int)
 }
 

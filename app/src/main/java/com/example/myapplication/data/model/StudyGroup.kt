@@ -19,9 +19,19 @@ import androidx.room.PrimaryKey
             parentColumns = ["courseId"],
             childColumns = ["courseId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = Assignment::class,
+            parentColumns = ["assignmentId"],
+            childColumns = ["taskId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
-    indices = [Index(value = ["creatorId"]), Index(value = ["courseId"])]
+    indices = [
+        Index(value = ["creatorId"]),
+        Index(value = ["courseId"]),
+        Index(value = ["taskId"])
+    ]
 )
 data class StudyGroup(
     @PrimaryKey(autoGenerate = true)
@@ -30,6 +40,7 @@ data class StudyGroup(
     val groupName: String,
     val description: String? = null,
     val courseId: Int? = null,
+    val taskId: Int? = null,
     val topic: String? = null,
     val maxMembers: Int = 20,
     val isPublic: Boolean = true

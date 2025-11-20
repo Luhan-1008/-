@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StudyGroupDao {
-    @Query("SELECT * FROM study_groups WHERE creatorId = :userId OR groupId IN (SELECT groupId FROM group_members WHERE userId = :userId)")
+    @Query("SELECT * FROM study_groups WHERE creatorId = :userId OR groupId IN (SELECT groupId FROM group_members WHERE userId = :userId AND status = 'JOINED')")
     fun getGroupsByUser(userId: Int): Flow<List<StudyGroup>>
     
     @Query("SELECT * FROM study_groups WHERE groupId = :groupId")
@@ -14,6 +14,9 @@ interface StudyGroupDao {
     
     @Query("SELECT * FROM study_groups WHERE isPublic = 1 AND (courseId = :courseId OR topic LIKE :topic)")
     fun searchPublicGroups(courseId: Int?, topic: String): Flow<List<StudyGroup>>
+    
+    @Query("SELECT * FROM study_groups WHERE courseId = :courseId")
+    fun getGroupsByCourse(courseId: Int): Flow<List<StudyGroup>>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGroup(group: StudyGroup): Long

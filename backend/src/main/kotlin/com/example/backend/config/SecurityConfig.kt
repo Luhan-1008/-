@@ -15,19 +15,10 @@ class SecurityConfig {
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http.csrf { it.disable() }
+            .formLogin { it.disable() }
+            .httpBasic { it.disable() }
             .authorizeHttpRequests {
-                it.requestMatchers(
-                    "/api/auth/register",
-                    "/api/auth/login",
-                    "/api/health",
-                    "/api/courses/**",
-                    "/api/assignments/**",
-                    "/api/groups/**",
-                    "/api/notes/**",
-                    "/api/analytics/**",
-                    "/api/notifications/**"
-                ).permitAll()
-                    .anyRequest().authenticated()
+                it.anyRequest().permitAll()
             }
         return http.build()
     }

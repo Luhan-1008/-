@@ -15,10 +15,14 @@ import com.example.myapplication.data.model.*
         StudyGroup::class,
         GroupMember::class,
         GroupMessage::class,
+        GroupFile::class,
+        GroupAnnouncement::class,
+        GroupTask::class,
+        GroupInvite::class,
         Note::class,
         Notification::class
     ],
-    version = 1,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +32,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun studyGroupDao(): StudyGroupDao
     abstract fun groupMemberDao(): GroupMemberDao
     abstract fun groupMessageDao(): GroupMessageDao
+    abstract fun groupFileDao(): GroupFileDao
+    abstract fun groupAnnouncementDao(): GroupAnnouncementDao
+    abstract fun groupTaskDao(): GroupTaskDao
+    abstract fun groupInviteDao(): GroupInviteDao
     abstract fun notificationDao(): NotificationDao
     
     companion object {
