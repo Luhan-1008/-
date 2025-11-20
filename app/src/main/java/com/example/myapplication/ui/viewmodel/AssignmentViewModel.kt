@@ -54,10 +54,8 @@ class AssignmentViewModel(private val repository: AssignmentRepository) : ViewMo
         _selectedAssignment.value = assignment
     }
     
-    fun insertAssignment(assignment: Assignment) {
-        viewModelScope.launch {
-            repository.insertAssignment(assignment)
-        }
+    suspend fun insertAssignment(assignment: Assignment): Long {
+        return repository.insertAssignment(assignment)
     }
     
     fun updateAssignment(assignment: Assignment) {
